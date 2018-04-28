@@ -155,37 +155,3 @@ def show_image(coco, image_dir, img, anns=None, title=''):
     plt.title(title)
     plt.show()
 
-
-def iterate_dataset(dataset):
-    iterator = dataset.make_one_shot_iterator()
-    next_pair = iterator.get_next()
-
-    with tf.Session() as sess:
-        while True:
-            try:
-                image, labels = sess.run(next_pair)
-                print(type(image), type(labels))
-                print(image.shape, labels.shape)
-            except tf.errors.OutOfRangeError:
-                print("Done")
-                break
-
-
-def try_dataset(image_dir, labels_dir, dataset_json_path):
-    dataset = get_dataset(image_dir, labels_dir, dataset_json_path, (28, 28))
-    iterate_dataset(dataset)
-
-
-# create_labels("E:\\data\\mlproj_dataset\\coco\\annotations\\instances_train2014.json",
-#               "E:\\data\\mlproj_dataset\\coco\\labels\\train2014",
-#               "E:\\data\\mlproj_dataset\\coco\\labels\\train2014_dataset.json")
-
-
-create_labels("E:\\data\\mlproj_dataset\\coco\\annotations\\instances_val2014.json",
-              "E:\\data\\mlproj_dataset\\coco\\labels\\val2014",
-              "E:\\data\\mlproj_dataset\\coco\\labels\\val2014_dataset.json")
-
-
-# try_dataset("E:\\data\\mlproj_dataset\\coco\\images\\train2014",
-#             "E:\\data\\mlproj_dataset\\coco\\labels\\train2014",
-#             "E:\\data\\mlproj_dataset\\coco\\labels\\train2014_dataset.json")

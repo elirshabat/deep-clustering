@@ -1,0 +1,16 @@
+dataset:
+ coco2014:
+  train:
+   images_dir: "E:/data/mlproj_dataset/coco/images/train2014"
+   labels_dir: "E:/data/mlproj_dataset/coco/labels/train2014"
+   json_file: "E:/data/mlproj_dataset/coco/labels/train2014_dataset.json"
+  validation:
+   images_dir: "E:/data/mlproj_dataset/coco/images/val2014"
+   labels_dir: "E:/data/mlproj_dataset/coco/labels/val2014"
+   json_file: "E:/data/mlproj_dataset/coco/labels/val2014_dataset.json"
+  test:
+   images_dir:  "E:/data/mlproj_dataset/coco/images/test2014"
+
+model:
+ resize_height: 28
+ resize_width: 28
