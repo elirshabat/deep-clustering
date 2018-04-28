@@ -7,6 +7,8 @@ from deepclustering.config.config import (get_train_labels_dir, get_train_images
                                           get_train_dataset_json_file, get_validation_dataset_json_file)
 import tensorflow as tf
 from deepclustering.dataset.coco import get_dataset
+from deepclustering.utilities.visualize import plot_image
+import matplotlib.pyplot as plt
 
 
 # Temporary
@@ -16,19 +18,24 @@ def iterate_dataset(dataset):
 
     with tf.Session() as sess:
         # while True:
-        for i in range(10):
+        for i in range(3):
             try:
                 image, labels = sess.run(next_pair)
                 print(type(image), type(labels))
                 print(image.shape, labels.shape)
+                plt.figure()
+                plot_image(image)
             except tf.errors.OutOfRangeError:
                 print("Done")
                 break
 
+    plt.show()
+
 
 def try_dataset(image_dir, labels_dir, dataset_json_path):
-    dataset = get_dataset(image_dir, labels_dir, dataset_json_path, (28, 28))
+    dataset = get_dataset(image_dir, labels_dir, dataset_json_path, (500, 500))
     iterate_dataset(dataset)
+
 
 
 # create_labels("E:\\data\\mlproj_dataset\\coco\\annotations\\instances_train2014.json",
