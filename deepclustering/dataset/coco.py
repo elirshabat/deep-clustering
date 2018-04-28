@@ -85,11 +85,11 @@ def _map_decode_images(image_filepath, labels_filepath, size):
     :return: A tupple of image and labels path.
     """
     image_decoded = tf.image.decode_jpeg(tf.read_file(image_filepath), channels=3)
-    image_resized = tf.image.resize_images(image_decoded, size)
-    return image_resized, labels_filepath
+    image_resized = tf.image.resize_images(image_decoded, size, method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+    return image_filepath, image_resized, labels_filepath
 
 
-def _map_decode_labels(image, labels_filepath, size):
+def _map_decode_labels(image_filepath, image, labels_filepath, size):
     """
     Map function for Dataset that maps labels file path to numpy array.
     :param image: Numpy array that represent image.
@@ -99,8 +99,8 @@ def _map_decode_labels(image, labels_filepath, size):
     :return: A tupple of iamge and it's labels.
     """
     labels = np.load(labels_filepath.decode())
-    labels_resized = cv2.resize(labels, dsize=size, interpolation=cv2.INTER_NEAREST)
-    return image, labels_resized
+    labels_resized = cv2.resize(labels, dsize=(size[1], size[0]), interpolation=cv2.INTER_NEAREST)
+    return image_filepath, image, labels_filepath, labels_resized
 
 
 def get_dataset(image_dir, labels_dir, dataset_json_path, image_size):
@@ -126,11 +126,11 @@ def get_dataset(image_dir, labels_dir, dataset_json_path, image_size):
     dataset = dataset.map(lambda image_path, labels_path:
                           _map_decode_images(image_path, labels_path, image_size))
 
-    dataset = dataset.map(lambda image, labels_path:
+    dataset = dataset.map(lambda image_path, image, labels_path:
                           tuple(tf.py_func(
-                              lambda image, labels_path: _map_decode_labels(image, labels_path, image_size),
-                              [image, labels_path],
-                              [image.dtype, tf.uint8])))
+                              lambda image_path, image, labels_path: _map_decode_labels(image_path, image, labels_path, image_size),
+                              [image_path, image, labels_path],
+                              [tf.string, image.dtype, tf.string, tf.uint8])))
 
     return dataset
 
