@@ -1,0 +1,4 @@
+Library for reading datasets
+-------------------------------------
+Each module in this library sholt return a tensorflow.data.Dataset object by using 
+the 'from_tensor_slices' function.
