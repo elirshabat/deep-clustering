@@ -33,3 +33,4 @@ def plot_labels_file(labels_path):
     img = np.array(PIL.Image.open(labels_path, 'r'))
     plt.axis('off')
     plt.imshow(img, alpha=0.5)
+

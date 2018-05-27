@@ -1,25 +1,24 @@
 import tensorflow as tf
+from collections import namedtuple
 
 
-def var_loss(x, y, hinge_value=1.0):
+def cluster_details(x, y):
     """
-    Compute the variance loss.
-    The variance loss gives high error for output points that are distance from the center of their clusters.
+    Compute the clusters details including: classes ids, cluster sizes and clusters centers.
     :param x: Matrix of data points in it's rows.
     :param y: Column vector of labels.
-    :param hinge_value: Points that closer to the centers of their clusters then this value, will have zero error.
-    :return: The variance loss.
+    :return: classes ids, cluster sizes, clusters centers
     """
     # x data dimension
     d_input = x.shape[1]
 
     # List of classes
-    u, idx = tf.unique(tf.reshape(y, [-1]))
-    n_clusters = tf.size(u)
+    c_ids, _ = tf.unique(tf.reshape(y, [-1]))
+    n_clusters = tf.size(c_ids)
 
     # For each label, a vector with the length of the number of points, with True where the point has the current label.
     # Row i correspond to label i in the unique vector u.
-    masks = tf.equal(tf.reshape(y, [-1]), tf.expand_dims(u, axis=1))
+    masks = tf.equal(tf.reshape(y, [-1]), tf.expand_dims(c_ids, axis=1))
 
     # Tiled masks:
     tiled_masks = tf.tile(tf.expand_dims(masks, axis=2), [1, 1, d_input])
@@ -38,6 +37,25 @@ def var_loss(x, y, hinge_value=1.0):
     tiled_c_size = tf.tile(tf.expand_dims(c_size, axis=1), [1, d_input])
     c_centers = tf.divide(cluster_sums, tf.cast(tiled_c_size, tf.float32))
 
+    return c_ids, c_size, c_centers
+
+
+def var_loss(x, y, hinge_value=1.0):
+    """
+    Compute the variance loss.
+    The variance loss gives high error for output points that are distance from the center of their clusters.
+    :param x: Matrix of data points in it's rows.
+    :param y: Column vector of labels.
+    :param hinge_value: Points that closer to the centers of their clusters then this value, will have zero error.
+    :return: The variance loss.
+    """
+    # Clusters details - ids, size and centers
+    _, c_size, c_centers = cluster_details(x, y)
+
+    # List of classes
+    u, idx = tf.unique(tf.reshape(y, [-1]))
+    n_clusters = tf.size(u)
+
     # Center point for each input point:
     indices = tf.expand_dims(idx, axis=1)
     x_centers = tf.gather_nd(c_centers, indices)
@@ -55,7 +73,9 @@ def var_loss(x, y, hinge_value=1.0):
     x_loss = tf.divide(x_unnormalized_loss, x_cluster_size)
 
     # Variance loss:
-    return tf.reduce_sum(x_loss) / tf.cast(n_clusters, tf.float32)
+    var_loss = tf.reduce_sum(x_loss) / tf.cast(n_clusters, tf.float32)
+
+    return var_loss, x_loss
 
 
 def distance_loss(x, y, hinge_value=1.0):
@@ -67,33 +87,11 @@ def distance_loss(x, y, hinge_value=1.0):
     :param hinge_value: Centers that are distant in more then this value, will have zero error.
     :return: The distance loss.
     """
-    # x data dimension
-    d = x.shape[1]
+    # Clusters details - ids, size and centers
+    c_ids, c_size, c_centers = cluster_details(x, y)
 
-    # List of classes
-    u, idx = tf.unique(tf.reshape(y, [-1]))
-    n_clusters = tf.size(u)
-
-    # For each label, a vector with the length of the number of points, with True where the point has the current label.
-    # Row i correspond to label i in the unique vector u.
-    masks = tf.equal(tf.reshape(y, [-1]), tf.expand_dims(u, axis=1))
-
-    # Tiled masks:
-    tiled_masks = tf.tile(tf.expand_dims(masks, axis=2), [1, 1, d])
-    tiled_masks = tf.cast(tiled_masks, tf.float32)
-
-    # Tiled x:
-    tiled_x = tf.tile(tf.expand_dims(x, axis=0), [n_clusters, 1, 1])
-
-    # Cluster sums:
-    cluster_sums = tf.reduce_sum(tf.multiply(tiled_masks, tiled_x), axis=1)
-
-    # Cluster sizes:
-    c_size = tf.reduce_sum(tf.cast(masks, tf.int32), axis=1)
-
-    # Cluster centers:
-    tiled_c_size = tf.tile(tf.expand_dims(c_size, axis=1), [1, d])
-    c_centers = tf.divide(cluster_sums, tf.cast(tiled_c_size, tf.float32))
+    # Number of clusters:
+    n_clusters = tf.size(c_ids)
 
     # Tiled centers:
     tiled_centers_1 = tf.tile(tf.expand_dims(c_centers, axis=2), [1, 1, n_clusters])
@@ -102,9 +100,11 @@ def distance_loss(x, y, hinge_value=1.0):
     # Distance matrix:
     distance_matrix = tf.norm(tiled_centers_1 - tiled_centers_2, axis=1)
 
-    # Un-normalized loss:
-    return tf.divide(tf.reduce_sum(tf.square(tf.nn.relu(2*hinge_value - distance_matrix))),
-                     tf.cast(n_clusters * (n_clusters - 1), tf.float32))
+    # Distance loss:
+    loss_value = tf.divide(tf.reduce_sum(tf.square(tf.nn.relu(2*hinge_value - distance_matrix))),
+                           tf.cast(n_clusters * (n_clusters - 1), tf.float32))
+
+    return loss_value, distance_matrix
 
 
 def regularization(x, y):
@@ -115,33 +115,11 @@ def regularization(x, y):
     :param y: Column vector of labels.
     :return: The regularization.
     """
-    # x data dimension
-    d = x.shape[1]
+    # Clusters details:
+    c_ids, _, c_centers = cluster_details(x, y)
 
-    # List of classes
-    u, idx = tf.unique(tf.reshape(y, [-1]))
-    n_clusters = tf.size(u)
-
-    # For each label, a vector with the length of the number of points, with True where the point has the current label.
-    # Row i correspond to label i in the unique vector u.
-    masks = tf.equal(tf.reshape(y, [-1]), tf.expand_dims(u, axis=1))
-
-    # Tiled masks:
-    tiled_masks = tf.tile(tf.expand_dims(masks, axis=2), [1, 1, d])
-    tiled_masks = tf.cast(tiled_masks, tf.float32)
-
-    # Tiled x:
-    tiled_x = tf.tile(tf.expand_dims(x, axis=0), [n_clusters, 1, 1])
-
-    # Cluster sums:
-    cluster_sums = tf.reduce_sum(tf.multiply(tiled_masks, tiled_x), axis=1)
-
-    # Cluster sizes:
-    c_size = tf.reduce_sum(tf.cast(masks, tf.int32), axis=1)
-
-    # Cluster centers:
-    tiled_c_size = tf.tile(tf.expand_dims(c_size, axis=1), [1, d])
-    c_centers = tf.divide(cluster_sums, tf.cast(tiled_c_size, tf.float32))
+    # Number of clusters:
+    n_clusters = tf.size(c_ids)
 
     # Regularization:
     return tf.divide(tf.reduce_sum(tf.norm(c_centers, axis=1)), tf.cast(n_clusters, tf.float32))
@@ -161,8 +139,13 @@ def loss(x, y, var_hinge, dist_hinge, var_weight=1.0, dist_weight=1.0, regulariz
     :param regularization_weight: Wight of the regularization term.
     :return: MIS loss.
     """
-    var_term = var_loss(x, y, hinge_value=var_hinge)
-    distance_term = distance_loss(x, y, hinge_value=dist_hinge)
+    var_term, x_var_loss = var_loss(x, y, hinge_value=var_hinge)
+    distance_term, distance_matrix = distance_loss(x, y, hinge_value=dist_hinge)
     regularization_term = regularization(x, y)
 
-    return var_weight*var_term + dist_weight*distance_term + regularization_weight*regularization_term
+    loss_value = var_weight*var_term + dist_weight*distance_term + regularization_weight*regularization_term
+
+    LossDetails = namedtuple('LossDetails', ['variance', 'distance_matrix'])
+    loss_details = LossDetails(x_var_loss, distance_matrix)
+
+    return loss_value, loss_details
